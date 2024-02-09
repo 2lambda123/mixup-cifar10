@@ -134,10 +134,38 @@ def mixup_data(x, y, alpha=1.0, use_cuda=True):
 
 
 def mixup_criterion(criterion, pred, y_a, y_b, lam):
+    """"Calculates the mixup criterion value given a criterion function, predicted values, and two labels with a mixing factor."
+    Parameters:
+        - criterion (function): The criterion function used to calculate the loss.
+        - pred (tensor): The predicted values.
+        - y_a (tensor): The first label.
+        - y_b (tensor): The second label.
+        - lam (float): The mixing factor between the two labels.
+    Returns:
+        - float: The mixup criterion value.
+    Processing Logic:
+        - Calculate the loss using the given criterion function.
+        - Multiply the loss by the mixing factor.
+        - Multiply the other loss by 1 minus the mixing factor.
+        - Add the two losses together to get the mixup criterion value."""
+    
     return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
 
 
 def train(epoch):
+    """Trains the neural network for one epoch.
+    Parameters:
+        - epoch (int): The current epoch number.
+    Returns:
+        - train_loss (float): The average training loss for the epoch.
+        - reg_loss (float): The average regularization loss for the epoch.
+        - accuracy (float): The overall accuracy for the epoch.
+    Processing Logic:
+        - Uses mixup data and criterion for training.
+        - Calculates the loss and updates the weights.
+        - Prints the progress bar with loss, regularization, and accuracy.
+        - Returns the average losses and accuracy for the epoch."""
+    
     print('\nEpoch: %d' % epoch)
     net.train()
     train_loss = 0
@@ -172,6 +200,17 @@ def train(epoch):
 
 
 def test(epoch):
+    """This function is used to test the performance of a neural network model. It takes in an epoch parameter and returns the test loss and accuracy. The function also updates the best accuracy and saves a checkpoint if the current accuracy is higher than the previous best accuracy.
+    Parameters:
+        - epoch (int): The current epoch number.
+    Returns:
+        - test_loss (float): The average loss of the model on the test data.
+        - accuracy (float): The percentage of correctly predicted labels on the test data.
+    Processing Logic:
+        - Evaluates the model on the test data.
+        - Calculates the test loss and accuracy.
+        - Updates the best accuracy and saves a checkpoint if necessary."""
+    
     global best_acc
     net.eval()
     test_loss = 0
@@ -202,6 +241,20 @@ def test(epoch):
 
 
 def checkpoint(acc, epoch):
+    """Saves a checkpoint of the model's state and training information.
+    Parameters:
+        - acc (float): The accuracy of the model.
+        - epoch (int): The current epoch of training.
+    Returns:
+        - None: This function does not return anything.
+    Processing Logic:
+        - Create a dictionary with the model, accuracy, epoch, and random number generator state.
+        - If the 'checkpoint' directory does not exist, create it.
+        - Save the dictionary to a file named 'ckpt.t7' with the model name and seed appended to the end.
+    Example:
+        checkpoint(0.85, 10)
+        # Output: Saving.."""
+    
     # Save checkpoint.
     print('Saving..')
     state = {

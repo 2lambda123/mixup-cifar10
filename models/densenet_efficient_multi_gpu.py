@@ -11,6 +11,17 @@ from functools import reduce
 
 
 def create_multi_gpu_storage(size=1024):
+    """Creates a list of GPU storage with specified size.
+    Parameters:
+        - size (int): Size of the storage in bytes. Default is 1024.
+    Returns:
+        - multi_storage (list): List of GPU storage with specified size.
+    Processing Logic:
+        - Creates a list of empty storage.
+        - Gets the number of available GPUs.
+        - Loops through each GPU and creates a storage with specified size.
+        - Appends the created storage to the list."""
+    
     multi_storage = []
     device_cnt = torch.cuda.device_count()
     for device_no in range(device_cnt):
@@ -21,13 +32,46 @@ def create_multi_gpu_storage(size=1024):
 
 class _SharedAllocation(object):
     def __init__(self, storage):
+        """Initializes the storage for the object.
+        Parameters:
+            - storage (list): List of storage locations.
+        Returns:
+            - None: This function does not return anything.
+        Processing Logic:
+            - Sets the first storage location as the main storage.
+            - Stores the list of storage locations.
+            - Can be used to initialize storage for an object.
+            - Used in the __init__ method."""
+        
         self.multi_storage = storage
         self.storage = self.multi_storage[0]
 
     def type(self, t):
+        """"Converts the data type of the storage to the specified type."
+        Parameters:
+            - t (type): The data type to convert the storage to.
+        Returns:
+            - None: The function does not return anything.
+        Processing Logic:
+            - Converts storage to specified type.
+            - Uses the type() function.
+            - Modifies the self.storage attribute."""
+        
         self.storage = self.storage.type(t)
 
     def type_as(self, obj):
+        """"Updates the type of the storage in the multi_storage attribute based on the type of the given object.
+        Parameters:
+            - obj (Variable or torch._TensorBase): The object whose type will be used to update the storage type in multi_storage.
+        Returns:
+            - None: This function does not return any value, it only updates the multi_storage attribute.
+        Processing Logic:
+            - Checks if the given object is an instance of Variable or torch._TensorBase.
+            - If it is a Variable, updates the storage type in multi_storage using the type of the object's data storage.
+            - If it is a torch._TensorBase, updates the storage type in multi_storage using the type of the object's storage.
+            - If it is neither, updates the storage type in multi_storage using the type of the object itself.
+        """"
+        
         new_sto = []
         if isinstance(obj, Variable):
             for sto in self.multi_storage:
@@ -41,9 +85,13 @@ class _SharedAllocation(object):
         self.multi_storage = new_sto
 
     def change_device(self, id):
+        """"""
+        
         return self.multi_storage[id]
 
     def resize_(self, size):
+        """"""
+        
         for device_no, sto in enumerate(self.multi_storage):
             if sto.size() < size:
                 with torch.cuda.device(device_no): # this line is crucial!!
@@ -61,6 +109,8 @@ class EfficientDensenetBottleneck(Module):
     is not perminant, these features are recomputed during the backward pass.
     """
     def __init__(self, shared_alloc, num_input_channels, num_output_channels):
+        """"""
+        
         super(EfficientDensenetBottleneck, self).__init__()
         self.shared_alloc = shared_alloc
         self.num_input_channels = num_input_channels
@@ -72,6 +122,8 @@ class EfficientDensenetBottleneck(Module):
         self._reset_parameters()
 
     def _reset_parameters(self):
+        """"""
+        
         self.norm_running_mean.zero_()
         self.norm_running_var.fill_(1)
         self.norm_weight.data.uniform_()
@@ -80,6 +132,8 @@ class EfficientDensenetBottleneck(Module):
         self.conv_weight.data.uniform_(-stdv, stdv)
 
     def forward(self, inputs):
+        """"""
+        
         if isinstance(inputs, Variable):
             inputs = [inputs]
         fn = _EfficientDensenetBottleneckFn(self.shared_alloc,
@@ -91,6 +145,8 @@ class EfficientDensenetBottleneck(Module):
 
 class _DenseLayer(Module):
     def __init__(self, shared_alloc, num_input_features, growth_rate, bn_size, drop_rate):
+        """"""
+        
         super(_DenseLayer, self).__init__()
         self.shared_alloc = shared_alloc
         self.drop_rate = drop_rate
@@ -110,6 +166,8 @@ class _DenseLayer(Module):
                             kernel_size=3, stride=1, padding=1, bias=False)
 
     def forward(self, x):
+        """"""
+        
         if isinstance(x, Variable):
             prev_features = [x]
         else:
@@ -125,6 +183,8 @@ class _DenseLayer(Module):
 
 class _DenseBlock(Module):
     def __init__(self, num_layers, num_input_features, bn_size, growth_rate, drop_rate, storage):
+        """"""
+        
         super(_DenseBlock, self).__init__()
         self.storage = storage
         self.final_num_features = num_input_features + (growth_rate * num_layers)
@@ -140,6 +200,8 @@ class _DenseBlock(Module):
             self.add_module('denselayer%d' % (i + 1), layer)
 
     def forward(self, x):
+        """"""
+        
         # Update storage type
         self.shared_alloc.type_as(x)
 
@@ -157,6 +219,8 @@ class _DenseBlock(Module):
 
 class TransitionBlock(nn.Module):
     def __init__(self, in_planes, out_planes, dropRate=0.0):
+        """"""
+        
         super(TransitionBlock, self).__init__()
         self.bn1 = nn.BatchNorm2d(in_planes)
         self.relu = nn.ReLU(inplace=True)
@@ -165,6 +229,8 @@ class TransitionBlock(nn.Module):
         self.droprate = dropRate
 
     def forward(self, x):
+        """"""
+        
         out = self.conv1(self.relu(self.bn1(x)))
         if self.droprate > 0:
             out = F.dropout(out, p=self.droprate, inplace=False, training=self.training)
@@ -190,6 +256,8 @@ class DenseNetEfficientMulti(Module):
     def __init__(self, growth_rate=12, block_config=(16, 16, 16), compression=0.5,
                  num_init_features=24, bn_size=4, drop_rate=0., avgpool_size=8,
                  num_classes=10):
+        """"""
+        
 
         super(DenseNetEfficientMulti, self).__init__()
         assert 0 < compression <= 1, 'compression of densenet should be between '
@@ -224,6 +292,8 @@ class DenseNetEfficientMulti(Module):
         self.classifier = nn.Linear(num_features, num_classes)
 
     def forward(self, x):
+        """"""
+        
         features = self.features(x)
         out = F.relu(features, inplace=True)
         out = F.avg_pool2d(out, kernel_size=self.avgpool_size).view(
@@ -232,6 +302,8 @@ class DenseNetEfficientMulti(Module):
         return out
 
 def DenseNet190():
+    """"""
+    
     return DenseNetEfficientMulti(growth_rate=40, block_config=(31, 31, 31), num_classes=10)
 
 # Begin gross code :/
@@ -239,9 +311,13 @@ def DenseNet190():
 
 class _EfficientCat(object):
     def __init__(self, storage):
+        """"""
+        
         self.storage = storage
 
     def forward(self, *inputs):
+        """"""
+        
         # Get size of new varible
         self.all_num_channels = [input.size(1) for input in inputs]
         size = list(inputs[0].size())
